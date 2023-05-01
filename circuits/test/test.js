@@ -31,6 +31,23 @@ describe('verification soul', ()=>{
         await circuit.checkConstraints(witness);
         await circuit.assertOut(witness, {out: "0"});
 
+        //Proove and verify
+        const { proof, publicSignals } =
+            await snarkjs.groth16.fullProve( input, path.join(__dirname, "../artifact/verifySoul.wasm"), path.join(__dirname, "../artifact/zkey_soul.zkey"));
+            
+        const vkey = JSON.parse(fs.readFileSync(path.join(__dirname, '../artifact/vkey_soul.json')).toString());
+                ;
+        const verificationResult = await snarkjs.groth16.verify(vkey, publicSignals, proof);
+            
+        console.log('Public Signals:')
+        console.log(publicSignals);
+            
+        console.log('proof:');
+        console.log(proof);
+        
+        console.log('Verification result:');
+        console.log(verificationResult);
+
     })
 });
 
