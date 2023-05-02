@@ -5,18 +5,26 @@ import "@account-abstraction/contracts/interfaces/UserOperation.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./ZKVerifier.sol";
+import "./MultiSigGuardian.sol";
 
 contract CosmicPortWallet is IAccount {
 
     using UserOperationLib for UserOperation;
     using ECDSA for bytes32;
 
+    enum ValidationMode{
+        Kyc,
+        Guardian    
+    }
+
     address payable public entryPoint;
+    address public guardian;
     bytes32 public soulHash;
     address public authService;
     bytes32 public latestSeqNo;
     bytes32 public latestAuthCodeHash;
     uint256 public transferThreshold;
+
 
     KYCVerifier kycVerifier;
     SoulVerifier soulVerifier;
@@ -28,24 +36,30 @@ contract CosmicPortWallet is IAccount {
         _;
     }
 
+    struct CosmicValidationData {
+        uint8 mode;
+        bytes validation;
+    }
 
-    constructor(address payable _entryPoint,bytes32 _soulHash, address _authService) {
+    constructor(address payable _entryPoint,bytes32 _soulHash, address _authService, address _guardian) {
         entryPoint = _entryPoint;
         soulHash = _soulHash;
         authService = _authService;
         transferThreshold = type(uint256).max;
         kycVerifier = new KYCVerifier();
         soulVerifier = new SoulVerifier();
+        guardian = _guardian;
     }
     
-    //支持多种模式
-    //设置备用地址和阈值
 
-    function validateUserOp(UserOperation calldata userOp, bytes32 userOpHash, address aggregator, uint256 missingAccountFunds)
+    function validateUserOp(UserOperation calldata userOp, bytes32 userOpHash, address, uint256 missingAccountFunds)
     external returns (uint256 validationData) {
         require(msg.sender == entryPoint, "Invalid caller");
         uint256 validUntil = 0;
-        try this.validateUserSignature(userOp) returns(uint256 expiration){
+        try this.validateUserSignature(userOp, userOpHash) returns(bool valid,uint256 expiration){
+            if (!valid){
+                return SIG_VALIDATION_FAILED;
+            }
             validUntil = uint48(expiration) << 160;
         }
         catch(bytes memory){
@@ -89,6 +103,9 @@ contract CosmicPortWallet is IAccount {
         authService = _newAuthService;
     }
 
+    function updateGuardian(address _newGuardian) external authorized {
+
+    }
 
     receive() external payable{
         
@@ -99,14 +116,27 @@ contract CosmicPortWallet is IAccount {
     }
 
     //signature
-    function validateUserSignature(UserOperation calldata userOp) public view returns(uint256 expiration){
+    function validateUserSignature(UserOperation calldata userOp, bytes32 userOpHash) public view returns(bool success, uint256 expiration){
+        (CosmicValidationData memory cosmicValidationData) = abi.decode(userOp.signature, (CosmicValidationData));
+        uint8 validationMode = cosmicValidationData.mode;
+        bytes calldata signature = userOp.signature;
+        if(validationMode == uint8(ValidationMode.Kyc)){
+            return _validateKyc(signature);
+        }
+        if(validationMode == uint8(ValidationMode.Guardian)){
+            return IGuardian(guardian).isValid(userOpHash, signature);
+        }
+        return (false, 0);
+    }
+
+    function _validateKyc(bytes calldata signature) internal view returns(bool success, uint256 expiration){
         //1. Decoding
         (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint[6] memory pubSignals)
-        = abi.decode(userOp.signature, (uint[2],uint[2][2], uint[2],uint[6]));
+        = abi.decode(signature, (uint[2],uint[2][2], uint[2],uint[6]));
         
         //2. Verify public signals
         //authCode, authCodeHash,userSoulHash,expiration, seqNo
-        bytes32 authCode = bytes32(pubSignals[1]);
+        // bytes32 authCode = bytes32(pubSignals[1]);
         bytes32 authCodeHash = bytes32(pubSignals[2]);
         bytes32 userSoulHash = bytes32(pubSignals[3]);
         expiration = pubSignals[4];//TODO: we may check the sanity of expiration but we cannot use block.timestamp so we need circuit modification
@@ -117,11 +147,12 @@ contract CosmicPortWallet is IAccount {
         require(soulHash == userSoulHash, "Invalid userSoulHash");
 
         //3. Verify proof
-        bool proofValidation = kycVerifier.verifyProof(pA, pB, pC, pubSignals);
-        require(proofValidation, "Proof validation failed");
+        success = kycVerifier.verifyProof(pA, pB, pC, pubSignals);
+
     }
 
     function validateUserSoul(bytes calldata proof) external view{
+        //TODO: need a nonce to prevent relay
         //Decoding
         (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint[2] memory pubSignals)
         = abi.decode(proof, (uint[2],uint[2][2], uint[2],uint[2]));
@@ -133,6 +164,7 @@ contract CosmicPortWallet is IAccount {
         //Verify proof
         bool proofValidation = soulVerifier.verifyProof(pA, pB, pC, pubSignals);
         require(proofValidation, "Proof validation failed");
+
     }
 }
 
