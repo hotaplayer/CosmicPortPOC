@@ -12,10 +12,6 @@ contract CosmicPortWallet is IAccount {
     using UserOperationLib for UserOperation;
     using ECDSA for bytes32;
 
-    enum ValidationMode{
-        Kyc,
-        Guardian    
-    }
 
     address payable public entryPoint;
     address public guardian;
@@ -32,14 +28,10 @@ contract CosmicPortWallet is IAccount {
     uint256 private constant SIG_VALIDATION_FAILED = 1;
     
     modifier authorized() {
-        require(msg.sender == address(this) || msg.sender== entryPoint, "Invalid user");
+        require(msg.sender == address(this) || msg.sender== entryPoint || msg.sender == guardian, "Invalid user");
         _;
     }
 
-    struct CosmicValidationData {
-        uint8 mode;
-        bytes validation;
-    }
 
     constructor(address payable _entryPoint,bytes32 _soulHash, address _authService, address _guardian) {
         entryPoint = _entryPoint;
@@ -104,7 +96,7 @@ contract CosmicPortWallet is IAccount {
     }
 
     function updateGuardian(address _newGuardian) external authorized {
-
+        guardian = _newGuardian;
     }
 
     receive() external payable{
@@ -117,16 +109,8 @@ contract CosmicPortWallet is IAccount {
 
     //signature
     function validateUserSignature(UserOperation calldata userOp, bytes32 userOpHash) public view returns(bool success, uint256 expiration){
-        (CosmicValidationData memory cosmicValidationData) = abi.decode(userOp.signature, (CosmicValidationData));
-        uint8 validationMode = cosmicValidationData.mode;
         bytes calldata signature = userOp.signature;
-        if(validationMode == uint8(ValidationMode.Kyc)){
-            return _validateKyc(signature);
-        }
-        if(validationMode == uint8(ValidationMode.Guardian)){
-            return IGuardian(guardian).isValid(userOpHash, signature);
-        }
-        return (false, 0);
+        return _validateKyc(signature);
     }
 
     function _validateKyc(bytes calldata signature) internal view returns(bool success, uint256 expiration){
