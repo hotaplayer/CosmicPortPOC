@@ -1,0 +1,40 @@
+// app global css in SCSS form
+
+.bg-cosmic {
+  background-color: $primary;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-image: url("~assets/welcomepage.png");
+}
+
+.bg-stars {
+  background-color: $primary;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-image: url("~assets/homepage.png");
+}
+
+.gradient {
+  background: linear-gradient(-45deg, #dd4ed1, #469ee2);
+}
+
+.text-gradient {
+  background: linear-gradient(-45deg, #dd4ed1, #469ee2);
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.border-gradient {
+  border: 10px solid;
+  border-image-slice: 1;
+  border-width: 3px;
+  border-image-source: linear-gradient(-45deg, #dd4ed1, #469ee2);
+}
+
+.round-border-sm {
+  border-radius: 10px;
+}
+
+.round-border-md {
+  border-radius: 30px;
+}
