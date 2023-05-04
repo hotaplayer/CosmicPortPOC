@@ -43,11 +43,14 @@ contract CosmicPortWallet is IAccount {
         guardian = _guardian;
     }
     
-
+    //The entrypoint of EIP-4337. Called by EntryPoint.
     function validateUserOp(UserOperation calldata userOp, bytes32 userOpHash, address, uint256 missingAccountFunds)
     external returns (uint256 validationData) {
         require(msg.sender == entryPoint, "Invalid caller");
         uint256 validUntil = 0;
+        //This validateUserSignature validates :
+        //1. User has his secret password
+        //2. User has made its KYC.
         try this.validateUserSignature(userOp, userOpHash) returns(bool valid,uint256 expiration){
             if (!valid){
                 return SIG_VALIDATION_FAILED;
@@ -109,7 +112,9 @@ contract CosmicPortWallet is IAccount {
         to.transfer(amount);
     }
 
-    //signature
+    //To make the transaction(payment), the validateUserSignature validates :
+    //1. User has his secret password
+    //2. User has made its KYC.
     function validateUserSignature(UserOperation calldata userOp, bytes32 userOpHash) public view returns(bool success, uint256 expiration){
         bytes calldata signature = userOp.signature;
         return _validateKyc(signature);
@@ -137,6 +142,7 @@ contract CosmicPortWallet is IAccount {
 
     }
 
+    //This is used for login.
     function validateUserSoul(bytes calldata proof) external view{
         //TODO: need a nonce to prevent relay
         //Decoding

@@ -3,7 +3,7 @@ pragma solidity ^0.8.11;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import "./IGuardian.sol";
 
-
+//Social Recovery.
 contract MultiSigGuardian {
 
     address public wallet;
@@ -30,7 +30,7 @@ contract MultiSigGuardian {
     }
 
     modifier authorized {
-        require(msg.sender == address(this), "Not authorized");
+        require(msg.sender == address(this) || msg.sender == wallet, "Not authorized");
         _;
     }
 
