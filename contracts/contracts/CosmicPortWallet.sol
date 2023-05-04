@@ -143,7 +143,7 @@ contract CosmicPortWallet is IAccount {
     }
 
     //This is used for login.
-    function validateUserSoul(bytes calldata proof) external view{
+    function validateUserSoul(bytes calldata proof) external view returns(bool success){
         //TODO: need a nonce to prevent relay
         //Decoding
         (uint[2] memory pA, uint[2][2] memory pB, uint[2] memory pC, uint[2] memory pubSignals)
@@ -154,9 +154,7 @@ contract CosmicPortWallet is IAccount {
         require(publicSoulHash == soulHash, "Invalid soul hash");
 
         //Verify proof
-        bool proofValidation = soulVerifier.verifyProof(pA, pB, pC, pubSignals);
-        require(proofValidation, "Proof validation failed");
-
+        success = soulVerifier.verifyProof(pA, pB, pC, pubSignals);
     }
 }
 

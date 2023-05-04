@@ -52,8 +52,7 @@ const signer = provider.getSigner();
 
 app.post('/api/user/register', async (req, res, next) => {
     try{
-        const { username, password } = req.body;
-        const userSoulHash = buf2hex(await goodPoseidon(poseidon, [buf2hex(Buffer.from(password,'utf-8')), buf2hex(Buffer.from(USER_SECRET,'utf-8'))]));
+        const { username, userSoulHash } = req.body;
         const walletAddress = await deployAA(userSoulHash);
         
         const token = generateToken();
@@ -70,7 +69,7 @@ app.post('/api/user/register', async (req, res, next) => {
 
         }
  
-        await userDb.put(username, {username, password, walletAddress,userSoulHash, token},
+        await userDb.put(username, {username, walletAddress,userSoulHash, token},
             {valueEncoding: "json"});
         await tokenDb.put(token, username);
         res.json({
@@ -91,7 +90,7 @@ app.post('/api/user/register', async (req, res, next) => {
 
 app.post('/api/user/login', async (req, res, next) => {
     try{
-        const { username, password } = req.body;
+        const { username, soulProof, publicSignals } = req.body;
         let userStr;
         try{
             userStr = await userDb.get(username);
@@ -105,11 +104,11 @@ app.post('/api/user/login', async (req, res, next) => {
             return;
         }
         let user = JSON.parse(userStr);
-        const userSoulHash = buf2hex(await goodPoseidon(poseidon, [buf2hex(Buffer.from(password,'utf-8')), buf2hex(Buffer.from(USER_SECRET,'utf-8'))]));
         const contract = new ethers.Contract(user.walletAddress,contractAbi, signer);
-        const soulHashOnChain = await contract.soulHash();
+        const encoded = ethers.utils.defaultAbiCoder.encode(["uint[2]", "uint[2][2]", "uint[2]", "uint[2]"], [soulProof.pi_a, soulProof.pi_b, soulProof.pi_c, publicSignals]);
+        const result = await contract.validateUserSoul(encoded);
         
-        if (userSoulHash !== soulHashOnChain){
+        if (!result){
             res.json(response(1002, "invalid password", null));
             return;
         }
