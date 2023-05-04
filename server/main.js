@@ -179,6 +179,7 @@ app.get('/api/user/threshold', async (req, res,next) => {
     }
 });
 
+//JUST FOR DEBUGGING
 app.get('/api/fake/asset', async (req, res, next) => {
     try{
         const user = await getUserFromToken(req, res);

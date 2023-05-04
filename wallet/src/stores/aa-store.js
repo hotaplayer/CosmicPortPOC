@@ -158,19 +158,22 @@ export const useAAStore = defineStore("aa", () => {
     return res;
   };
 
-  const sendTxn = async () => {
+  const sendTxn = async (proof, publicSignals, to, value) => {
     isLoading.value = true;
-    let payload = {
-      to: toAddress.value,
-      value: convertEthToWei(toAmount.value),
-      proof: proof.value,
-      publicSignals: publicSignals.value,
-    };
-    const {
-      data: { code, data: res },
-    } = await api.post("/api/fake/transfer", payload);
+
+    //Verify zk proof
+    //TODO: we should use ERC4337EthersSDK but we are in a rush so no time to do so
+    const contract = new ethers.Contract(localStorage.getItem('wa'), contractAbi, signer);
+    const result = await contract.verifyProof(user, proof, publicSignals);
+    if (!result){
+      return undefined;
+        }
+    //Send transaction
+    const txReceipt = await (await contract.execute(to, [], value)).wait();
+    res = {code: 0, message: '', data:{
+      transactionHash: txReceipt.transactionHash
+    }}
     isLoading.value = false;
-    if (code !== 0) return false;
     return res;
   };
 
@@ -209,45 +212,58 @@ export const useAAStore = defineStore("aa", () => {
     return ethGas.value;
   };
 
-  const updateGuardian = async (newGuardian) => {
+  const updateGuardian = async (proof, publicSignals, newGuardian) => {
     isLoading.value = true;
-    let payload = [newGuardian];
-    const {
-      data: { code, data: res },
-    } = await api.post("/api/fake/guardian", payload);
-    isLoading.value = false;
-    if (code !== 0) return false;
+    //Verify zk proof
+    //TODO: we should use ERC4337EthersSDK but we are in a rush so no time to do so
+    const contract = new ethers.Contract(localStorage.getItem('wa'), contractAbi, signer);
+    const result = await contract.verifyProof(user, proof, publicSignals);
+    if (!result){
+            return undefined;
+        }
+    //Send transaction
+    const data = contract.interface.encodeFunctionData("addGuardian", [newGuardian]);
+
+    const txReceipt = await (await contract.execute(to, data, value)).wait();
+    res = {code: 0, message: '', data:{
+      transactionHash: txReceipt.transactionHash
+    }}
     return res;
   };
 
-  const updateLimits = async (ethAmount) => {
+  const updateLimits = async (proof, publicSignals, newThreshold) => {
     isLoading.value = true;
-    let weiAmount = convertEthToWei(ethAmount);
-    console.log(weiAmount);
-    let payload = {
-      threshold: weiAmount.toString(),
-      proof: proof.value,
-      publicSignals: publicSignals.value,
-    };
-    const {
-      data: { code, data: res },
-    } = await api.post("/api/fake/updateThreshold", payload);
+    const contract = new ethers.Contract(localStorage.getItem('wa'), contractAbi, signer);
+    const result = await contract.verifyProof(user, proof, publicSignals);
+    if (!result){
+      return undefined;
+    }
+    //Send transaction
+    const data = contract.interface.encodeFunctionData("updateThreshold", [newThreshold]);
+
+    const txReceipt = await (await contract.execute(to, data, value)).wait();
+    res = {code: 0, message: '', data:{
+      transactionHash: txReceipt.transactionHash
+    }}
     isLoading.value = false;
-    if (code !== 0) return false;
-    return { threshold: weiAmount };
+    return res;
   };
 
-  const updatePwd = async (newPwd) => {
-    let payload = {
-      password: newPwd,
-      proof: proof.value,
-      publicSignals: publicSignals.value,
-    };
-    const {
-      data: { code, data: res },
-    } = await api.post("/api/fake/password", payload);
+  const updatePwd = async (proof, publicSignals, newSoulHash) => {
+    isLoading.value = true;
+    const contract = new ethers.Contract(localStorage.getItem('wa'), contractAbi, signer);
+    const result = await contract.verifyProof(user, proof, publicSignals);
+    if (!result){
+      return undefined;
+    }
+    //Send transaction
+    const data = contract.interface.encodeFunctionData("updateUserSoulHash", [newSoulHash]);
+
+    const txReceipt = await (await contract.execute(to, data, value)).wait();
+    res = {code: 0, message: '', data:{
+      transactionHash: txReceipt.transactionHash
+    }}
     isLoading.value = false;
-    if (code !== 0) return false;
     return res;
   };
 
