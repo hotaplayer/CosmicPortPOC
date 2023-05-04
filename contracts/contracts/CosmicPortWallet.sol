@@ -61,6 +61,8 @@ contract CosmicPortWallet is IAccount {
             (bool success,) = entryPoint.call{value: missingAccountFunds}("");
             //require(success);//No need to judge
         }
+        latestAuthCodeHash = bytes32(0);//Make it anti-replay attack
+
         return validUntil;
     }
 
